@@ -1,0 +1,58 @@
+package views
+
+import "github.com/bendigiorgio/go-kv/internal/engine"
+import "github.com/bendigiorgio/go-kv/internal/web/views/components"
+
+templ Home(engine *engine.Engine) {
+	<main class="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-500 to-purple-200">
+		<div class="grid md:grid-cols-2 grid-cols-1 gap-6 max-w-2xl w-full p-8">
+			@components.DashboardTitle(engine)
+			<a
+				href={ templ.URL("/web/settings") }
+				class="bg-white rounded-lg shadow-xl p-8 min-h-32 relative group"
+			>
+				<span class="absolute top-1 right-1 text-xs uppercase inline-flex gap-x-0.5 items-center text-gray-500">
+					<span>Settings</span>
+					<svg
+						class="group-hover:scale-125 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+						height="16"
+						stroke-linejoin="round"
+						viewBox="0 0 16 16"
+						width="16"
+						style="color: currentcolor;"
+					>
+						<path
+							fill-rule="evenodd"
+							clip-rule="evenodd"
+							d="M6.75011 4H6.00011V5.5H6.75011H9.43945L5.46978 9.46967L4.93945 10L6.00011 11.0607L6.53044 10.5303L10.499 6.56182V9.25V10H11.999V9.25V5C11.999 4.44772 11.5512 4 10.999 4H6.75011Z"
+							fill="currentColor"
+						></path>
+					</svg>
+				</span>
+			</a>
+			<a
+				href={ templ.URL("/web/list") }
+				class="bg-white rounded-lg shadow-xl p-8 min-h-32 relative group"
+			>
+				<span class="absolute top-1 right-1 text-xs uppercase inline-flex gap-x-0.5 items-center text-gray-500">
+					<span>List</span>
+					<svg
+						class="group-hover:scale-125 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+						height="16"
+						stroke-linejoin="round"
+						viewBox="0 0 16 16"
+						width="16"
+						style="color: currentcolor;"
+					>
+						<path
+							fill-rule="evenodd"
+							clip-rule="evenodd"
+							d="M6.75011 4H6.00011V5.5H6.75011H9.43945L5.46978 9.46967L4.93945 10L6.00011 11.0607L6.53044 10.5303L10.499 6.56182V9.25V10H11.999V9.25V5C11.999 4.44772 11.5512 4 10.999 4H6.75011Z"
+							fill="currentColor"
+						></path>
+					</svg>
+				</span>
+			</a>
+		</div>
+	</main>
+}

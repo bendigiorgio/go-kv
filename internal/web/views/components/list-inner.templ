@@ -1,0 +1,12 @@
+package components
+
+type KVPair struct {
+	Key   string
+	Value string
+}
+
+templ ListInner(kvPairs []KVPair) {
+	for index, pair := range kvPairs {
+		@KeyValueCard(index, pair.Key, pair.Value)
+	}
+}
