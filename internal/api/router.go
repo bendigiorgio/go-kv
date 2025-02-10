@@ -36,33 +36,38 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // registerRoutes sets up API endpoints
 func (r *Router) registerRoutes(useWebUI bool) {
-	r.mux.HandleFunc("/set", r.handleSet)
-	r.mux.HandleFunc("/get", r.handleGet)
-	r.mux.HandleFunc("/delete", r.handleDelete)
-	r.mux.HandleFunc("/list", r.handleList)
-	r.mux.HandleFunc("/flush", r.handleFlush)
-	r.mux.HandleFunc("/compact", r.handleCompact)
-	r.mux.HandleFunc("/memory-usage", r.handleGetMemoryUsage)
-	r.mux.HandleFunc("/count", r.handleGetKeyCount)
-	r.mux.HandleFunc("/batch/set", r.handleBatchSet)
-	r.mux.HandleFunc("/batch/delete", r.handleBatchDelete)
+	// API Routes
+	apiRoutes := map[string]http.HandlerFunc{
+		"/set":               r.handleSet,
+		"/get":               r.handleGet,
+		"/delete":            r.handleDelete,
+		"/list":              r.handleList,
+		"/flush":             r.handleFlush,
+		"/compact":           r.handleCompact,
+		"/memory-usage":      r.handleGetMemoryUsage,
+		"/count":             r.handleGetKeyCount,
+		"/batch/set":         r.handleBatchSet,
+		"/batch/delete":      r.handleBatchDelete,
+		"/web/api/list":      r.wrapWebApiRouteHandler(r.handleRefreshList),
+		"/web/api/dashboard": r.wrapWebApiRouteHandler(r.handleDashboardStats),
+	}
+
+	for path, handler := range apiRoutes {
+		r.mux.HandleFunc(path, handler)
+	}
 
 	// WEB UI
 	if useWebUI {
-		var web_routes = routes.GetRoutes()
 		fs := http.FileServer(http.FS(internal.StaticFiles))
 		r.mux.Handle("/web/static/", http.StripPrefix("/web/", fs))
-		for _, route := range web_routes {
-			var handler = r.getWebRouteHandler(route)
-			var path = "/web" + route.Path
-			r.mux.HandleFunc(path, handler)
+
+		for _, route := range routes.GetRoutes() {
+			r.mux.HandleFunc("/web"+route.Path, r.getWebRouteHandler(route))
 		}
+
 		r.mux.HandleFunc("/web/*", func(w http.ResponseWriter, req *http.Request) {
 			http.NotFound(w, req)
 		})
-
-		r.mux.HandleFunc("/web/api/list", r.wrapWebApiRouteHandler(r.handleRefreshList))
-		r.mux.HandleFunc("/web/api/dashboard", r.wrapWebApiRouteHandler(r.handleDashboardStats))
 	}
 }
 
@@ -98,5 +103,7 @@ func (r *Router) Stop() error {
 func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("Failed to encode JSON response: %v\n", err)
+	}
 }

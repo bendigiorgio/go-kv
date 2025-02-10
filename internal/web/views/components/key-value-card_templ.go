@@ -31,7 +31,7 @@ func KeyValueCard(index int, key string, value string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<li class=\"px-4 rounded-md border grid grid-cols-[20px_1px_1fr_1px_1fr] text-sm relative kv-list-item\" x-data=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<li class=\"px-4 rounded-md border grid grid-cols-[40px_1px_1fr_1px_1fr] text-sm relative kv-list-item\" x-data=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -44,7 +44,7 @@ func KeyValueCard(index int, key string, value string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" :class=\"search === &#39;&#39; || key.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase()) ? &#39;block&#39; : &#39;hidden&#39;\"><div class=\"w-full relative py-2\"><p class=\"w-full\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" :class=\"search === &#39;&#39; || key.toLowerCase().includes(search.toLowerCase()) || value.toLowerCase().includes(search.toLowerCase()) ? &#39;block&#39; : &#39;hidden&#39;\"><div class=\"w-full relative py-2 text-xs text-center align-middle\"><p class=\"w-full\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -22,11 +22,10 @@ func (r Route) Handle(w http.ResponseWriter, req *http.Request, eng *engine.Engi
 	return page.Render(req.Context(), w)
 }
 
-// Define HomeRoute without manually using Layout
 var HomeRoute = Route{
 	Title: "KV Dashboard",
 	Component: func(eng *engine.Engine) templ.Component {
-		return views.Home(eng) // No need to manually wrap in Layout anymore!
+		return views.Home(eng)
 	},
 	Path: "",
 }
@@ -39,7 +38,6 @@ var ListRoute = Route{
 	Path: "/list",
 }
 
-// GetRoutes returns all defined routes
 func GetRoutes() []Route {
 	return []Route{HomeRoute, ListRoute}
 }

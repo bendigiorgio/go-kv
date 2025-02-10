@@ -8,13 +8,14 @@ import (
 	"github.com/bendigiorgio/go-kv/internal/engine"
 )
 
-const testFilePath = "test_data.txt"
-const testFlushPath = "test_flush.txt"
+const TEST_FILE_PATH = "test_data.db"
+const TEST_FLUSH_PATH = "test_flush.db"
 
 // Helper function to create a fresh engine instance
 func setupEngine(memoryLimit int) *engine.Engine {
-	_ = os.Remove(testFilePath) // Ensure a fresh start
-	return engine.NewEngine(testFilePath, testFlushPath, memoryLimit)
+	_ = os.Remove(TEST_FILE_PATH) // Ensure a fresh start
+	engine, _ := engine.NewEngine(TEST_FILE_PATH, TEST_FLUSH_PATH, memoryLimit)
+	return engine
 }
 
 func Test_SetAndGet(t *testing.T) {
@@ -99,7 +100,7 @@ func Test_SaveAndLoad(t *testing.T) {
 	}
 
 	// Create a new engine and load from file
-	db2 := engine.NewEngine(testFilePath, testFlushPath, 1024)
+	db2, _ := engine.NewEngine(TEST_FILE_PATH, TEST_FLUSH_PATH, 1024)
 
 	value, err := db2.Get("name")
 	if err != nil || value != "Alice" {
@@ -131,7 +132,7 @@ func Test_MemoryLimitTriggersRollingFlush(t *testing.T) {
 	}
 
 	// Load a new engine and check data is still retrievable
-	db2 := engine.NewEngine(testFilePath, testFlushPath, 50)
+	db2, _ := engine.NewEngine(TEST_FILE_PATH, TEST_FLUSH_PATH, 50)
 
 	_, err := db2.Get("k1")
 	_, err2 := db2.Get("k2")
@@ -176,7 +177,7 @@ func Test_EnsureDataPersistsAcrossInstances(t *testing.T) {
 	_ = db.Save()
 
 	// Create a new engine instance to test persistence
-	db2 := engine.NewEngine(testFilePath, testFlushPath, 1024)
+	db2, _ := engine.NewEngine(TEST_FILE_PATH, TEST_FLUSH_PATH, 1024)
 
 	value, err := db2.Get("persistentKey")
 	if err != nil {
@@ -206,7 +207,7 @@ func Test_EnsureLRUFlushLogic(t *testing.T) {
 	}
 
 	// Reload from disk to check persistence
-	db2 := engine.NewEngine(testFilePath, testFlushPath, 100)
+	db2, _ := engine.NewEngine(TEST_FILE_PATH, TEST_FLUSH_PATH, 100)
 
 	// Some keys should still be available after the flush
 	_, err := db2.Get("c")
@@ -216,7 +217,7 @@ func Test_EnsureLRUFlushLogic(t *testing.T) {
 	}
 }
 
-func TestCompactFlushedData(t *testing.T) {
+func Test_CompactFlushedData(t *testing.T) {
 	db := setupEngine(50) // Set low memory limit to force flush
 
 	// Step 1: Insert multiple keys to exceed memory limit and trigger a flush
@@ -234,7 +235,7 @@ func TestCompactFlushedData(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Step 4: Ensure flushed.db is created
-	if _, err := os.Stat(testFlushPath); os.IsNotExist(err) {
+	if _, err := os.Stat(TEST_FLUSH_PATH); os.IsNotExist(err) {
 		t.Fatalf("Flushed data file not found; expected a flush to occur")
 	}
 
@@ -245,7 +246,7 @@ func TestCompactFlushedData(t *testing.T) {
 	}
 
 	// Step 6: Ensure flushed.db is deleted after compaction
-	if _, err := os.Stat(testFlushPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(TEST_FLUSH_PATH); !os.IsNotExist(err) {
 		t.Fatalf("Flushed data file still exists after compaction")
 	}
 

@@ -12,20 +12,22 @@ func (r *Router) handleSet(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var requestData map[string]string
+	var requestData struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+
 	if err := json.NewDecoder(req.Body).Decode(&requestData); err != nil {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
 		return
 	}
 
-	key, keyExists := requestData["key"]
-	value, valueExists := requestData["value"]
-	if !keyExists || !valueExists {
+	if requestData.Key == "" || requestData.Value == "" {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "Missing key or value"})
 		return
 	}
 
-	if err := r.store.Set(key, value); err != nil {
+	if err := r.store.Set(requestData.Key, requestData.Value); err != nil {
 		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": "Failed to set value"})
 		return
 	}
@@ -124,6 +126,7 @@ func (r *Router) handleGetMemoryUsage(w http.ResponseWriter, req *http.Request) 
 	jsonResponse(w, http.StatusOK, map[string]int{"memory": mem})
 }
 
+// handleGetKeyCount returns the number of keys in the store
 func (r *Router) handleGetKeyCount(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		jsonResponse(w, http.StatusMethodNotAllowed, map[string]string{"error": "Invalid Method"})
@@ -134,6 +137,7 @@ func (r *Router) handleGetKeyCount(w http.ResponseWriter, req *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]int{"count": count})
 }
 
+// handleBatchSet handles setting multiple keys in a batch
 func (r *Router) handleBatchSet(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		jsonResponse(w, http.StatusMethodNotAllowed, map[string]string{"error": "Only POST allowed"})
@@ -165,6 +169,7 @@ func (r *Router) handleBatchSet(w http.ResponseWriter, req *http.Request) {
 	})
 }
 
+// handleBatchDelete handles deleting multiple keys in a batch
 func (r *Router) handleBatchDelete(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		jsonResponse(w, http.StatusMethodNotAllowed, map[string]string{"error": "Invalid Method"})

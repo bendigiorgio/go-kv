@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"strings"
@@ -24,6 +25,7 @@ type Engine struct {
 	fileMu             sync.Mutex
 	saveChan           chan struct{}
 	flushChan          chan struct{}
+	shutdownChan       chan struct{} // For graceful shutdown
 }
 
 type EngineConfig struct {
@@ -41,27 +43,40 @@ type EngineConfig struct {
 //   - memoryLimit: The memory limit for the engine.
 //
 // Returns:
-//
-//	A pointer to the new Engine instance.
-func NewEngine(filePath string, flushPath string, memoryLimit int) *Engine {
+//   - A pointer to the new Engine instance.
+//   - An error if initialization fails.
+func NewEngine(filePath, flushPath string, memoryLimit int) (*Engine, error) {
+	if memoryLimit <= 0 {
+		return nil, errors.New("memory limit must be positive")
+	}
+	if filePath == "" || flushPath == "" {
+		return nil, errors.New("file paths cannot be empty")
+	}
+
 	e := &Engine{
-		data:        make(map[string]string),
-		filePath:    filePath,
-		flushPath:   flushPath,
-		memoryLimit: memoryLimit,
-		saveChan:    make(chan struct{}, 1),
-		flushChan:   make(chan struct{}, 1),
+		data:         make(map[string]string),
+		filePath:     filePath,
+		flushPath:    flushPath,
+		memoryLimit:  memoryLimit,
+		saveChan:     make(chan struct{}, 1),
+		flushChan:    make(chan struct{}, 1),
+		shutdownChan: make(chan struct{}),
 	}
 
 	if err := e.Load(); err != nil {
-		fmt.Printf("Failed to load data: %v\n", err)
+		return nil, fmt.Errorf("failed to load data: %w", err)
 	}
 
 	// Start background workers
 	go e.autoSaveWorker()
 	go e.autoFlushWorker()
 
-	return e
+	return e, nil
+}
+
+// Shutdown gracefully stops the background workers.
+func (e *Engine) Shutdown() {
+	close(e.shutdownChan)
 }
 
 // Set adds or updates a key-value pair and triggers async saving or flushing.
@@ -161,16 +176,16 @@ func (e *Engine) SaveFile(data map[string]string) error {
 	e.fileMu.Lock()
 	defer e.fileMu.Unlock()
 
-	file, err := os.OpenFile(e.filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(e.filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_SYNC, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
-	writer := bufio.NewWriter(file)
+	writer := bufio.NewWriterSize(file, 64*1024) // 64 KB buffer
 	for key, value := range data {
 		if _, err := writer.WriteString(key + keyValueSeparator + value + "\n"); err != nil {
-			return err
+			return fmt.Errorf("failed to write data: %w", err)
 		}
 	}
 	return writer.Flush()
@@ -179,36 +194,41 @@ func (e *Engine) SaveFile(data map[string]string) error {
 // autoSaveWorker periodically saves data when triggered.
 func (e *Engine) autoSaveWorker() {
 	for {
-		<-e.saveChan
-		time.Sleep(1 * time.Second) // Debounce multiple save requests
+		select {
+		case <-e.saveChan:
+			time.Sleep(1 * time.Second) // Debounce multiple save requests
 
-		e.mu.RLock()
-		dataCopy := make(map[string]string)
-		for k, v := range e.data {
-			dataCopy[k] = v
-		}
-		e.mu.RUnlock()
+			e.mu.RLock()
+			dataCopy := make(map[string]string, len(e.data))
+			for k, v := range e.data {
+				dataCopy[k] = v
+			}
+			e.mu.RUnlock()
 
-		if err := e.SaveFile(dataCopy); err != nil {
-			fmt.Printf("Error saving data: %v\n", err)
+			if err := e.SaveFile(dataCopy); err != nil {
+				log.Printf("Error saving data: %v\n", err)
+			}
+		case <-e.shutdownChan:
+			return
 		}
 	}
 }
 
+// AppendFlushedData appends flushed data to the flush file.
 func (e *Engine) AppendFlushedData(data map[string]string) error {
 	e.fileMu.Lock()
 	defer e.fileMu.Unlock()
 
-	file, err := os.OpenFile(e.flushPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(e.flushPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY|os.O_SYNC, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open flush file: %w", err)
 	}
 	defer file.Close()
 
-	writer := bufio.NewWriter(file)
+	writer := bufio.NewWriterSize(file, 64*1024) // 64 KB buffer
 	for key, value := range data {
 		if _, err := writer.WriteString(key + keyValueSeparator + value + "\n"); err != nil {
-			return err
+			return fmt.Errorf("failed to write flushed data: %w", err)
 		}
 	}
 	return writer.Flush()
@@ -217,45 +237,50 @@ func (e *Engine) AppendFlushedData(data map[string]string) error {
 // autoFlushWorker removes just enough old data when memory usage exceeds the limit.
 func (e *Engine) autoFlushWorker() {
 	for {
-		<-e.flushChan
-		e.mu.Lock()
+		select {
+		case <-e.flushChan:
+			e.mu.Lock()
 
-		if e.currentMemoryUsage < e.memoryLimit {
+			if e.currentMemoryUsage < e.memoryLimit {
+				e.mu.Unlock()
+				continue
+			}
+
+			bytesToFree := e.currentMemoryUsage - e.memoryLimit
+			evictedData := make(map[string]string)
+			freedBytes := 0
+
+			log.Printf("Memory limit exceeded! Flushing oldest keys to flushed.db... currentMemoryUsage: %d, memoryLimit: %d\n", e.currentMemoryUsage, e.memoryLimit)
+
+			for len(e.evictionQueue) > 0 && freedBytes < bytesToFree {
+				key := e.evictionQueue[0] // Remove oldest key first
+				e.evictionQueue = e.evictionQueue[1:]
+
+				if val, exists := e.data[key]; exists {
+					evictedData[key] = val
+					freedBytes += len(key) + len(val)
+					delete(e.data, key)
+				}
+			}
+
+			e.currentMemoryUsage -= freedBytes
 			e.mu.Unlock()
-			continue
-		}
 
-		bytesToFree := e.currentMemoryUsage - e.memoryLimit
-		evictedData := make(map[string]string)
-		freedBytes := 0
+			log.Printf("Flushed keys: %d, Freed bytes: %d\n", len(evictedData), freedBytes)
 
-		fmt.Println("Memory limit exceeded! Flushing oldest keys to flushed.db...", "currentMemoryUsage:", e.currentMemoryUsage, "memoryLimit:", e.memoryLimit)
-
-		for len(e.evictionQueue) > 0 && freedBytes < bytesToFree {
-			key := e.evictionQueue[0] // Remove oldest key first
-			e.evictionQueue = e.evictionQueue[1:]
-
-			if val, exists := e.data[key]; exists {
-				evictedData[key] = val
-				freedBytes += len(key) + len(val)
-				delete(e.data, key)
+			// Save flushed data separately
+			if len(evictedData) > 0 {
+				if err := e.AppendFlushedData(evictedData); err != nil {
+					log.Printf("Error saving flushed data: %v\n", err)
+				}
 			}
-		}
-
-		e.currentMemoryUsage -= freedBytes
-		e.mu.Unlock()
-
-		println("Flushed keys:", len(evictedData), "Freed bytes:", freedBytes)
-
-		// Save flushed data separately
-		if len(evictedData) > 0 {
-			if err := e.AppendFlushedData(evictedData); err != nil {
-				fmt.Printf("Error saving flushed data: %v\n", err)
-			}
+		case <-e.shutdownChan:
+			return
 		}
 	}
 }
 
+// Load loads data from disk into memory.
 func (e *Engine) Load() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -267,13 +292,13 @@ func (e *Engine) Load() error {
 	// Load primary data from data.db
 	dataFromFile, err := e.loadFromFile(e.filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load data from file: %w", err)
 	}
 
 	// Load evicted (flushed) data from flushed.db
 	flushedData, err := e.loadFromFile(e.flushPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load flushed data: %w", err)
 	}
 
 	// Merge flushed data into main memory (flushed keys take precedence)
@@ -287,7 +312,7 @@ func (e *Engine) Load() error {
 		e.currentMemoryUsage += len(key) + len(value)
 	}
 
-	fmt.Println("Load complete: Memory store restored from disk.")
+	log.Println("Load complete: Memory store restored from disk.")
 	return nil
 }
 
@@ -298,7 +323,7 @@ func (e *Engine) loadFromFile(filePath string) (map[string]string, error) {
 		if os.IsNotExist(err) {
 			return make(map[string]string), nil // Return an empty map if file doesn't exist
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
@@ -318,9 +343,9 @@ func (e *Engine) loadFromFile(filePath string) (map[string]string, error) {
 	return data, scanner.Err()
 }
 
-// CompactFlushedData ensures flushed data is merged into data.db and safely deleted
+// CompactFlushedData ensures flushed data is merged into data.db and safely deleted.
 func (e *Engine) CompactFlushedData() error {
-	fmt.Println("Starting compaction of flushed data...")
+	log.Println("Starting compaction of flushed data...")
 
 	// Step 1: Pause auto-save to avoid race conditions
 	e.mu.Lock()
@@ -331,35 +356,35 @@ func (e *Engine) CompactFlushedData() error {
 	// Step 2: Ensure any pending flush completes before compaction
 	err := e.forceFlush()
 	if err != nil {
-		return err
+		return fmt.Errorf("force flush failed: %w", err)
 	}
-	println("Forced flush completed")
+	log.Println("Forced flush completed")
 
 	// Step 3: Load flushed data **without locking**
 	flushedData, err := e.loadFromFile(e.flushPath)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to load flushed data: %w", err)
 	}
-	println("Flushed data loaded")
+	log.Println("Flushed data loaded")
 
 	// Step 4: Load existing data from data.db **without locking**
 	existingData, err := e.loadFromFile(e.filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load existing data: %w", err)
 	}
-	println("Existing data loaded")
+	log.Println("Existing data loaded")
 
 	// Step 5: Merge flushed data into existing data
 	for key, value := range flushedData {
 		existingData[key] = value
 	}
-	println("Data merged")
+	log.Println("Data merged")
 
 	// Step 6: Save merged data to main data file
 	if err := e.SaveFile(existingData); err != nil {
-		return err
+		return fmt.Errorf("failed to save merged data: %w", err)
 	}
-	println("Merged data saved")
+	log.Println("Merged data saved")
 
 	// Step 7: Update memory usage accurately
 	e.mu.Lock()
@@ -370,15 +395,15 @@ func (e *Engine) CompactFlushedData() error {
 	e.saveChan = saveWorker // Restore save worker after compaction
 	e.mu.Unlock()
 
-	println("Memory usage updated")
+	log.Println("Memory usage updated")
 
 	// Step 8: Remove flushed.db after unlocking
 	if err := os.Remove(e.flushPath); err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to remove flushed file: %w", err)
 	}
-	println("Flushed data removed")
+	log.Println("Flushed data removed")
 
-	fmt.Println("Compaction completed successfully.")
+	log.Println("Compaction completed successfully.")
 	return nil
 }
 
@@ -393,8 +418,8 @@ func (e *Engine) Save() error {
 func (e *Engine) PrintMemoryUsage() {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
-	fmt.Printf("HeapAlloc: %d KB, TotalAlloc: %d KB, Sys: %d KB\n", memStats.HeapAlloc/1024, memStats.TotalAlloc/1024, memStats.Sys/1024)
-	fmt.Printf("Current Store Memory Usage: %d bytes\n", e.currentMemoryUsage)
+	log.Printf("HeapAlloc: %d KB, TotalAlloc: %d KB, Sys: %d KB\n", memStats.HeapAlloc/1024, memStats.TotalAlloc/1024, memStats.Sys/1024)
+	log.Printf("Current Store Memory Usage: %d bytes\n", e.currentMemoryUsage)
 }
 
 // Testing Helpers
