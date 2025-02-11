@@ -1,0 +1,272 @@
+openapi: 3.0.0
+info:
+  title: Go-KV API
+  description: API for managing a key-value store with additional features like flushing, compaction, and memory usage tracking.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+paths:
+  /set:
+    post:
+      summary: Set a key-value pair
+      description: Adds or updates a key-value pair in the store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                  description: The key to set.
+                value:
+                  type: string
+                  description: The value to associate with the key.
+              required:
+                - key
+                - value
+      responses:
+        "200":
+          description: Key set successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Key set successfully
+        "400":
+          description: Bad request (e.g., missing key or value)
+        "405":
+          description: Invalid HTTP method
+        "500":
+          description: Internal server error (e.g., failed to set value)
+
+  /get:
+    get:
+      summary: Get a value by key
+      description: Retrieves the value associated with a key.
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Value retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                    example: myKey
+                  value:
+                    type: string
+                    example: myValue
+        "400":
+          description: Bad request (e.g., missing key parameter)
+        "404":
+          description: Key not found
+        "405":
+          description: Invalid HTTP method
+
+  /delete:
+    delete:
+      summary: Delete a key
+      description: Removes a key-value pair from the store.
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Key deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Key deleted successfully
+        "400":
+          description: Bad request (e.g., missing key parameter)
+        "405":
+          description: Invalid HTTP method
+        "500":
+          description: Internal server error (e.g., failed to delete key)
+
+  /list:
+    get:
+      summary: List all key-value pairs
+      description: Returns all key-value pairs in the store.
+      responses:
+        "200":
+          description: Key-value pairs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  key1: value1
+                  key2: value2
+        "405":
+          description: Invalid HTTP method
+
+  /flush:
+    post:
+      summary: Flush the database
+      description: Clears all key-value pairs from the store.
+      responses:
+        "200":
+          description: Database flushed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Database flushed
+        "405":
+          description: Invalid HTTP method
+
+  /compact:
+    post:
+      summary: Compact flushed data
+      description: Merges flushed data into the main database and removes the flushed file.
+      responses:
+        "200":
+          description: Compaction completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Compaction completed
+        "405":
+          description: Invalid HTTP method
+        "500":
+          description: Internal server error (e.g., compaction failed)
+
+  /memory-usage:
+    get:
+      summary: Get memory usage
+      description: Returns the current memory usage of the store.
+      responses:
+        "200":
+          description: Memory usage retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memory:
+                    type: integer
+                    example: 1024
+        "405":
+          description: Invalid HTTP method
+
+  /count:
+    get:
+      summary: Get key count
+      description: Returns the number of keys in the store.
+      responses:
+        "200":
+          description: Key count retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 42
+        "405":
+          description: Invalid HTTP method
+
+  /batch/set:
+    post:
+      summary: Batch set key-value pairs
+      description: Sets multiple key-value pairs in a single request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  value:
+                    type: string
+                required:
+                  - key
+                  - value
+      responses:
+        "200":
+          description: Keys set successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Keys set successfully
+                  keys_set:
+                    type: integer
+                    example: 3
+        "400":
+          description: Bad request (e.g., invalid JSON format)
+        "405":
+          description: Invalid HTTP method
+        "500":
+          description: Internal server error (e.g., failed to set values)
+
+  /batch/delete:
+    post:
+      summary: Batch delete keys
+      description: Deletes multiple keys in a single request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      responses:
+        "200":
+          description: Keys deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Keys deleted successfully
+                  keys_deleted:
+                    type: integer
+                    example: 2
+        "400":
+          description: Bad request (e.g., invalid JSON format)
+        "405":
+          description: Invalid HTTP method
+        "500":
+          description: Internal server error (e.g., failed to delete keys)
