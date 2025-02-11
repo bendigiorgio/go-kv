@@ -1,12 +1,9 @@
 package components
 
-type KVPair struct {
-	Key   string
-	Value string
-}
+import "github.com/bendigiorgio/go-kv/internal/engine"
 
-templ ListInner(kvPairs []KVPair) {
+templ ListInner(kvPairs []engine.KVPair, page int, limit int) {
 	for index, pair := range kvPairs {
-		@KeyValueCard(index, pair.Key, pair.Value)
+		@KeyValueCard(index+((page-1)*limit), pair.Key, pair.Value)
 	}
 }

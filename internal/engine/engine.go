@@ -34,6 +34,11 @@ type EngineConfig struct {
 	MemoryLimit int
 }
 
+type KVPair struct {
+	Key   string
+	Value string
+}
+
 // NewEngine creates a new instance of Engine with the specified file path, flush path, and memory limit.
 // It initializes the internal data structures and starts background workers for auto-saving and auto-flushing.
 //
@@ -493,4 +498,38 @@ func (e *Engine) LoadConfig(config EngineConfig) error {
 	e.memoryLimit = config.MemoryLimit
 
 	return e.Load()
+}
+
+func (e *Engine) GetSlice(limit int, offset int) []KVPair {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// Calculate the starting index (1-based)
+	start := (offset - 1) * limit
+	if offset < 1 {
+		start = 0
+	}
+	// Return empty slice if start is out of bounds
+	if start < 0 || (start+1 > len(e.evictionQueue)) {
+		return []KVPair{}
+	}
+
+	// Calculate the end index (ensure it doesn't exceed the slice bounds)
+	end := start + limit
+	if end > len(e.evictionQueue) {
+		end = len(e.evictionQueue)
+	}
+
+	// Extract the keys for the current page
+	keys := e.evictionQueue[start:end]
+
+	// Build the key-value pairs
+	kvPairs := make([]KVPair, 0, len(keys))
+	for _, key := range keys {
+		if value, exists := e.data[key]; exists {
+			kvPairs = append(kvPairs, KVPair{Key: key, Value: value})
+		}
+	}
+
+	return kvPairs
 }

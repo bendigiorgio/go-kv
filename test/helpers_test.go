@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"testing"
 
 	"github.com/go-faker/faker/v4"
@@ -36,12 +37,12 @@ func Test_SeedDatabase(t *testing.T) {
 
 	// marshal tags to JSON body
 	body := BatchRequestBody{}
-	for _, tag := range tags {
+	for i, tag := range tags {
 		body = append(body, struct {
 			Key   string `json:"key"`
 			Value string `json:"value"`
 		}{
-			Key:   tag.Key,
+			Key:   strconv.FormatInt(int64(i), 10) + "-" + tag.Key,
 			Value: tag.Value,
 		})
 	}

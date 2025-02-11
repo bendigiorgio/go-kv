@@ -1,18 +1,22 @@
 package views
 
-import "github.com/bendigiorgio/go-kv/internal/engine"
-import "github.com/bendigiorgio/go-kv/internal/web/views/components"
+import (
+	Engine "github.com/bendigiorgio/go-kv/internal/engine"
+	"github.com/bendigiorgio/go-kv/internal/web/views/components"
+	"strconv"
+)
 
-func GetListAsSlice(engine *engine.Engine) []components.KVPair {
-	var list []components.KVPair
-	for key, value := range engine.List() {
-		list = append(list, components.KVPair{Key: key, Value: value})
-	}
-	return list
+type ListQueryParams struct {
+	Page  int
+	Limit int
 }
 
-templ List(engine *engine.Engine) {
-	<main class="h-screen max-w-full overflow-clip relative">
+templ List(engine *Engine.Engine, searchParams ListQueryParams) {
+	<main
+		id="list-main"
+		data-count={ strconv.Itoa(engine.KeyCount()) }
+		class="h-screen max-w-full overflow-clip relative"
+	>
 		<section
 			id="list-scroll-section"
 			class="relative overflow-y-auto h-full w-full p-6 pt-2"
@@ -53,7 +57,7 @@ templ List(engine *engine.Engine) {
 						x-model="search"
 					/>
 					<button
-						hx-get="/web/api/list"
+						id="refresh-button"
 						hx-trigger="click"
 						hx-target="#kv-list"
 						hx-indicator="#kv-list"
@@ -81,11 +85,24 @@ templ List(engine *engine.Engine) {
 					</button>
 				</div>
 				<ul
+					x-data="{total: 0}"
 					id="kv-list"
 					class="flex flex-col gap-y-1 mt-3"
 				>
-					@components.ListInner(GetListAsSlice(engine))
+					@components.ListInner(engine.GetSlice(searchParams.Limit, searchParams.Page), searchParams.Page, searchParams.Limit)
+					<!-- Infinite Scroll Trigger -->
 				</ul>
+				<div
+					id="infinite-scroll-trigger"
+					hx-trigger="intersect"
+					hx-swap="beforeend"
+					hx-target="#kv-list"
+					hx-indicator="#loading-indicator"
+				></div>
+				<!-- Loading Indicator -->
+				<div id="loading-indicator" class="htmx-indicator">
+					Loading more items...
+				</div>
 			</div>
 		</section>
 		<button
@@ -119,5 +136,55 @@ templ List(engine *engine.Engine) {
 			behavior: 'smooth'
 		})
 	}
+	function getParams(){
+		const urlParams = new URLSearchParams(window.location.search);
+		const page = parseInt(urlParams.get('page'),10 )|| 1;
+		const limit = parseInt(urlParams.get('limit'), 10) || 50;
+		return {page, limit}
+	}
+
+	function setParams(page, limit){
+		const url = new URL(window.location.href);
+		url.searchParams.set('page', page);
+		url.searchParams.set('limit', limit);
+		window.history.pushState({}, '', url);
+	}
+
+	function resetParams(){
+		const url = new URL(window.location.href);
+		url.searchParams.set('page', 1);
+		url.searchParams.set('limit', 50);
+		window.history.pushState({}, '', url);
+	}
+
+	function getTotal(){
+		const {page, limit} = getParams();
+		return page * limit;
+	}
+
+	htmx.on("#infinite-scroll-trigger", "intersect", function (evt){
+		const count = parseInt(document.getElementById('list-main').dataset.count);
+		const {page, limit} = getParams();
+		if (getTotal() >= count){
+			return;
+		}
+		const newPage = parseInt(page) + 1;
+		setParams(newPage, limit);
+		htmx.ajax('GET', `/web/api/list?page=${newPage}&limit=${limit}`, {
+			target: "#kv-list", 
+			indicator: "#loading-indicator",
+			swap: "beforeend",
+		});
+	})
+
+	htmx.on("#refresh-button", "click", function(evt){
+	const total = getTotal()
+
+	htmx.ajax("GET", `/web/api/list?limit=${total}&page=1`, {
+		target: "#kv-list",
+		indicator: "#kv-list",
+		disabled: evt.target,
+		})
+	})
 	</script>
 }

@@ -8,18 +8,18 @@ package views
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/bendigiorgio/go-kv/internal/engine"
-import "github.com/bendigiorgio/go-kv/internal/web/views/components"
+import (
+	Engine "github.com/bendigiorgio/go-kv/internal/engine"
+	"github.com/bendigiorgio/go-kv/internal/web/views/components"
+	"strconv"
+)
 
-func GetListAsSlice(engine *engine.Engine) []components.KVPair {
-	var list []components.KVPair
-	for key, value := range engine.List() {
-		list = append(list, components.KVPair{Key: key, Value: value})
-	}
-	return list
+type ListQueryParams struct {
+	Page  int
+	Limit int
 }
 
-func List(engine *engine.Engine) templ.Component {
+func List(engine *Engine.Engine, searchParams ListQueryParams) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -40,24 +40,37 @@ func List(engine *engine.Engine) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<main class=\"h-screen max-w-full overflow-clip relative\"><section id=\"list-scroll-section\" class=\"relative overflow-y-auto h-full w-full p-6 pt-2\"><div class=\"flex flex-col gap-y-2\"><h1 class=\"text-4xl font-medium\">Key Value List</h1><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<main id=\"list-main\" data-count=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var2 templ.SafeURL = templ.URL("/web")
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var2)))
+		var templ_7745c5c3_Var2 string
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(engine.KeyCount()))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/views/list.templ`, Line: 17, Col: 46}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"text-xs px-2.5 py-1.5 bg-blue-600 text-blue-50 hover:bg-blue-400 transition-colors inline-flex items-center gap-x-1 rounded-lg w-fit\"><svg class=\"size-[1em]\" stroke-linejoin=\"round\" viewBox=\"0 0 16 16\" style=\"color: currentcolor;\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M12.5 6.56062L8.00001 2.06062L3.50001 6.56062V13.5L6.00001 13.5V11C6.00001 9.89539 6.89544 8.99996 8.00001 8.99996C9.10458 8.99996 10 9.89539 10 11V13.5L12.5 13.5V6.56062ZM13.78 5.71933L8.70711 0.646409C8.31659 0.255886 7.68342 0.255883 7.2929 0.646409L2.21987 5.71944C2.21974 5.71957 2.21961 5.7197 2.21949 5.71982L0.469676 7.46963L-0.0606537 7.99996L1.00001 9.06062L1.53034 8.53029L2.00001 8.06062V14.25V15H2.75001L6.00001 15H7.50001H8.50001H10L13.25 15H14V14.25V8.06062L14.4697 8.53029L15 9.06062L16.0607 7.99996L15.5303 7.46963L13.7806 5.71993C13.7804 5.71973 13.7802 5.71953 13.78 5.71933ZM8.50001 11V13.5H7.50001V11C7.50001 10.7238 7.72386 10.5 8.00001 10.5C8.27615 10.5 8.50001 10.7238 8.50001 11Z\" fill=\"currentColor\"></path></svg> <span>Return to Dashboard</span></a></div><div class=\"mx-auto w-full max-w-2xl pb-12 mt-12\" x-data=\"{\n\t\t\t\t\tsearch: &#39;&#39;,\n\t\t\t\t\t}\"><div class=\"w-full flex items-center justify-end\"></div><div class=\"flex items-center gap-x-2 relative\"><input class=\"w-full border rounded-lg px-3 py-1 text-sm\" placeholder=\"Search...\" x-model=\"search\"> <button hx-get=\"/web/api/list\" hx-trigger=\"click\" hx-target=\"#kv-list\" hx-indicator=\"#kv-list\" hx-disabled-elt=\"this\" class=\"group flex text-xs items-center gap-x-1 px-2 py-1 h-full border border-blue-600 text-blue-600 hover:bg-blue-100 transition-colors rounded-lg disabled:grayscale-50 disabled:cursor-not-allowed cursor-pointer\"><span><svg class=\"size-[1em] group-disabled:animate-spin transition-transform \" height=\"16\" stroke-linejoin=\"round\" viewBox=\"0 0 16 16\" width=\"16\" style=\"color: currentcolor;\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M8.00002 1.25C5.33749 1.25 3.02334 2.73677 1.84047 4.92183L1.48342 5.58138L2.80253 6.29548L3.15958 5.63592C4.09084 3.91566 5.90986 2.75 8.00002 2.75C10.4897 2.75 12.5941 4.40488 13.2713 6.67462H11.8243H11.0743V8.17462H11.8243H15.2489C15.6631 8.17462 15.9989 7.83883 15.9989 7.42462V4V3.25H14.4989V4V5.64468C13.4653 3.06882 10.9456 1.25 8.00002 1.25ZM1.50122 10.8555V12.5V13.25H0.0012207V12.5V9.07538C0.0012207 8.66117 0.337007 8.32538 0.751221 8.32538H4.17584H4.92584V9.82538H4.17584H2.72876C3.40596 12.0951 5.51032 13.75 8.00002 13.75C10.0799 13.75 11.8912 12.5958 12.8266 10.8895L13.1871 10.2318L14.5025 10.9529L14.142 11.6105C12.9539 13.7779 10.6494 15.25 8.00002 15.25C5.05453 15.25 2.53485 13.4313 1.50122 10.8555Z\" fill=\"currentColor\"></path></svg></span> <span>Refresh</span></button></div><ul id=\"kv-list\" class=\"flex flex-col gap-y-1 mt-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"h-screen max-w-full overflow-clip relative\"><section id=\"list-scroll-section\" class=\"relative overflow-y-auto h-full w-full p-6 pt-2\"><div class=\"flex flex-col gap-y-2\"><h1 class=\"text-4xl font-medium\">Key Value List</h1><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = components.ListInner(GetListAsSlice(engine)).Render(ctx, templ_7745c5c3_Buffer)
+		var templ_7745c5c3_Var3 templ.SafeURL = templ.URL("/web")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var3)))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</ul></div></section><button x-data class=\"rounded-full flex items-center justify-center w-10 h-10 hover:cursor-pointer absolute bottom-4 right-6 bg-blue-500 text-blue-50 border-none\" @click=\"handleScrollUp\"><svg stroke-linejoin=\"round\" viewBox=\"0 0 16 16\" style=\"color: currentcolor;\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M14.5 8C14.5 11.5898 11.5899 14.5 8 14.5C4.41015 14.5 1.5 11.5899 1.5 8C1.5 4.41015 4.41015 1.5 8 1.5C11.5898 1.5 14.5 4.41015 14.5 8ZM8 16C12.4183 16 16 12.4183 16 8C16 3.58172 12.4183 -5.4282e-07 8 -3.49691e-07C3.58172 -1.56562e-07 -5.4282e-07 3.58172 -3.49691e-07 8C-1.56562e-07 12.4183 3.58172 16 8 16ZM11.2803 8.46967L8.70004 5.88938C8.31342 5.50276 7.68658 5.50276 7.29996 5.88938L4.71967 8.46967L4.18934 9L5.25 10.0607L5.78033 9.53033L8 7.31066L10.2197 9.53033L10.75 10.0607L11.8107 9L11.2803 8.46967Z\" fill=\"currentColor\"></path></svg></button></main><style>\n\t.htmx-request .kv-list-item {\n\t\topacity: 0.3;\n\t}\n\t</style><script>\n\tfunction handleScrollUp(){\n\t\tdocument.getElementById('list-scroll-section').scrollTo({\n\t\t\ttop: 0,\n\t\t\tbehavior: 'smooth'\n\t\t})\n\t}\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" class=\"text-xs px-2.5 py-1.5 bg-blue-600 text-blue-50 hover:bg-blue-400 transition-colors inline-flex items-center gap-x-1 rounded-lg w-fit\"><svg class=\"size-[1em]\" stroke-linejoin=\"round\" viewBox=\"0 0 16 16\" style=\"color: currentcolor;\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M12.5 6.56062L8.00001 2.06062L3.50001 6.56062V13.5L6.00001 13.5V11C6.00001 9.89539 6.89544 8.99996 8.00001 8.99996C9.10458 8.99996 10 9.89539 10 11V13.5L12.5 13.5V6.56062ZM13.78 5.71933L8.70711 0.646409C8.31659 0.255886 7.68342 0.255883 7.2929 0.646409L2.21987 5.71944C2.21974 5.71957 2.21961 5.7197 2.21949 5.71982L0.469676 7.46963L-0.0606537 7.99996L1.00001 9.06062L1.53034 8.53029L2.00001 8.06062V14.25V15H2.75001L6.00001 15H7.50001H8.50001H10L13.25 15H14V14.25V8.06062L14.4697 8.53029L15 9.06062L16.0607 7.99996L15.5303 7.46963L13.7806 5.71993C13.7804 5.71973 13.7802 5.71953 13.78 5.71933ZM8.50001 11V13.5H7.50001V11C7.50001 10.7238 7.72386 10.5 8.00001 10.5C8.27615 10.5 8.50001 10.7238 8.50001 11Z\" fill=\"currentColor\"></path></svg> <span>Return to Dashboard</span></a></div><div class=\"mx-auto w-full max-w-2xl pb-12 mt-12\" x-data=\"{\n\t\t\t\t\tsearch: &#39;&#39;,\n\t\t\t\t\t}\"><div class=\"w-full flex items-center justify-end\"></div><div class=\"flex items-center gap-x-2 relative\"><input class=\"w-full border rounded-lg px-3 py-1 text-sm\" placeholder=\"Search...\" x-model=\"search\"> <button id=\"refresh-button\" hx-trigger=\"click\" hx-target=\"#kv-list\" hx-indicator=\"#kv-list\" hx-disabled-elt=\"this\" class=\"group flex text-xs items-center gap-x-1 px-2 py-1 h-full border border-blue-600 text-blue-600 hover:bg-blue-100 transition-colors rounded-lg disabled:grayscale-50 disabled:cursor-not-allowed cursor-pointer\"><span><svg class=\"size-[1em] group-disabled:animate-spin transition-transform \" height=\"16\" stroke-linejoin=\"round\" viewBox=\"0 0 16 16\" width=\"16\" style=\"color: currentcolor;\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M8.00002 1.25C5.33749 1.25 3.02334 2.73677 1.84047 4.92183L1.48342 5.58138L2.80253 6.29548L3.15958 5.63592C4.09084 3.91566 5.90986 2.75 8.00002 2.75C10.4897 2.75 12.5941 4.40488 13.2713 6.67462H11.8243H11.0743V8.17462H11.8243H15.2489C15.6631 8.17462 15.9989 7.83883 15.9989 7.42462V4V3.25H14.4989V4V5.64468C13.4653 3.06882 10.9456 1.25 8.00002 1.25ZM1.50122 10.8555V12.5V13.25H0.0012207V12.5V9.07538C0.0012207 8.66117 0.337007 8.32538 0.751221 8.32538H4.17584H4.92584V9.82538H4.17584H2.72876C3.40596 12.0951 5.51032 13.75 8.00002 13.75C10.0799 13.75 11.8912 12.5958 12.8266 10.8895L13.1871 10.2318L14.5025 10.9529L14.142 11.6105C12.9539 13.7779 10.6494 15.25 8.00002 15.25C5.05453 15.25 2.53485 13.4313 1.50122 10.8555Z\" fill=\"currentColor\"></path></svg></span> <span>Refresh</span></button></div><ul x-data=\"{total: 0}\" id=\"kv-list\" class=\"flex flex-col gap-y-1 mt-3\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = components.ListInner(engine.GetSlice(searchParams.Limit, searchParams.Page), searchParams.Page, searchParams.Limit).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Infinite Scroll Trigger --></ul><div id=\"infinite-scroll-trigger\" hx-trigger=\"intersect\" hx-swap=\"beforeend\" hx-target=\"#kv-list\" hx-indicator=\"#loading-indicator\"></div><!-- Loading Indicator --><div id=\"loading-indicator\" class=\"htmx-indicator\">Loading more items...</div></div></section><button x-data class=\"rounded-full flex items-center justify-center w-10 h-10 hover:cursor-pointer absolute bottom-4 right-6 bg-blue-500 text-blue-50 border-none\" @click=\"handleScrollUp\"><svg stroke-linejoin=\"round\" viewBox=\"0 0 16 16\" style=\"color: currentcolor;\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M14.5 8C14.5 11.5898 11.5899 14.5 8 14.5C4.41015 14.5 1.5 11.5899 1.5 8C1.5 4.41015 4.41015 1.5 8 1.5C11.5898 1.5 14.5 4.41015 14.5 8ZM8 16C12.4183 16 16 12.4183 16 8C16 3.58172 12.4183 -5.4282e-07 8 -3.49691e-07C3.58172 -1.56562e-07 -5.4282e-07 3.58172 -3.49691e-07 8C-1.56562e-07 12.4183 3.58172 16 8 16ZM11.2803 8.46967L8.70004 5.88938C8.31342 5.50276 7.68658 5.50276 7.29996 5.88938L4.71967 8.46967L4.18934 9L5.25 10.0607L5.78033 9.53033L8 7.31066L10.2197 9.53033L10.75 10.0607L11.8107 9L11.2803 8.46967Z\" fill=\"currentColor\"></path></svg></button></main><style>\n\t.htmx-request .kv-list-item {\n\t\topacity: 0.3;\n\t}\n\t</style><script>\n\tfunction handleScrollUp(){\n\t\tdocument.getElementById('list-scroll-section').scrollTo({\n\t\t\ttop: 0,\n\t\t\tbehavior: 'smooth'\n\t\t})\n\t}\n\tfunction getParams(){\n\t\tconst urlParams = new URLSearchParams(window.location.search);\n\t\tconst page = parseInt(urlParams.get('page'),10 )|| 1;\n\t\tconst limit = parseInt(urlParams.get('limit'), 10) || 50;\n\t\treturn {page, limit}\n\t}\n\n\tfunction setParams(page, limit){\n\t\tconst url = new URL(window.location.href);\n\t\turl.searchParams.set('page', page);\n\t\turl.searchParams.set('limit', limit);\n\t\twindow.history.pushState({}, '', url);\n\t}\n\n\tfunction resetParams(){\n\t\tconst url = new URL(window.location.href);\n\t\turl.searchParams.set('page', 1);\n\t\turl.searchParams.set('limit', 50);\n\t\twindow.history.pushState({}, '', url);\n\t}\n\n\tfunction getTotal(){\n\t\tconst {page, limit} = getParams();\n\t\treturn page * limit;\n\t}\n\n\thtmx.on(\"#infinite-scroll-trigger\", \"intersect\", function (evt){\n\t\tconst count = parseInt(document.getElementById('list-main').dataset.count);\n\t\tconst {page, limit} = getParams();\n\t\tif (getTotal() >= count){\n\t\t\treturn;\n\t\t}\n\t\tconst newPage = parseInt(page) + 1;\n\t\tsetParams(newPage, limit);\n\t\thtmx.ajax('GET', `/web/api/list?page=${newPage}&limit=${limit}`, {\n\t\t\ttarget: \"#kv-list\", \n\t\t\tindicator: \"#loading-indicator\",\n\t\t\tswap: \"beforeend\",\n\t\t});\n\t})\n\n\thtmx.on(\"#refresh-button\", \"click\", function(evt){\n\tconst total = getTotal()\n\n\thtmx.ajax(\"GET\", `/web/api/list?limit=${total}&page=1`, {\n\t\ttarget: \"#kv-list\",\n\t\tindicator: \"#kv-list\",\n\t\tdisabled: evt.target,\n\t\t})\n\t})\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
