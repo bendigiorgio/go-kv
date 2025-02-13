@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 const keyValueSeparator = " "
@@ -211,7 +212,7 @@ func (e *Engine) autoSaveWorker() {
 			e.mu.RUnlock()
 
 			if err := e.SaveFile(dataCopy); err != nil {
-				log.Printf("Error saving data: %v\n", err)
+				log.Error().Stack().Err(err).Msg("Error saving data")
 			}
 		case <-e.shutdownChan:
 			return
@@ -255,7 +256,7 @@ func (e *Engine) autoFlushWorker() {
 			evictedData := make(map[string]string)
 			freedBytes := 0
 
-			log.Printf("Memory limit exceeded! Flushing oldest keys to flushed.db... currentMemoryUsage: %d, memoryLimit: %d\n", e.currentMemoryUsage, e.memoryLimit)
+			log.Info().Msgf("Memory limit exceeded! Flushing oldest keys to flushed.db... currentMemoryUsage: %d, memoryLimit: %d\n", e.currentMemoryUsage, e.memoryLimit)
 
 			for len(e.evictionQueue) > 0 && freedBytes < bytesToFree {
 				key := e.evictionQueue[0] // Remove oldest key first
@@ -271,12 +272,12 @@ func (e *Engine) autoFlushWorker() {
 			e.currentMemoryUsage -= freedBytes
 			e.mu.Unlock()
 
-			log.Printf("Flushed keys: %d, Freed bytes: %d\n", len(evictedData), freedBytes)
+			log.Info().Msgf("Flushed keys: %d, Freed bytes: %d\n", len(evictedData), freedBytes)
 
 			// Save flushed data separately
 			if len(evictedData) > 0 {
 				if err := e.AppendFlushedData(evictedData); err != nil {
-					log.Printf("Error saving flushed data: %v\n", err)
+					log.Error().Stack().Err(err).Msg("Error saving flushed data")
 				}
 			}
 		case <-e.shutdownChan:
@@ -317,7 +318,7 @@ func (e *Engine) Load() error {
 		e.currentMemoryUsage += len(key) + len(value)
 	}
 
-	log.Println("Load complete: Memory store restored from disk.")
+	log.Info().Msg("Load complete: Memory store restored from disk.")
 	return nil
 }
 
@@ -350,7 +351,7 @@ func (e *Engine) loadFromFile(filePath string) (map[string]string, error) {
 
 // CompactFlushedData ensures flushed data is merged into data.db and safely deleted.
 func (e *Engine) CompactFlushedData() error {
-	log.Println("Starting compaction of flushed data...")
+	log.Info().Msg("Starting compaction of flushed data...")
 
 	// Step 1: Pause auto-save to avoid race conditions
 	e.mu.Lock()
@@ -363,33 +364,33 @@ func (e *Engine) CompactFlushedData() error {
 	if err != nil {
 		return fmt.Errorf("force flush failed: %w", err)
 	}
-	log.Println("Forced flush completed")
+	log.Trace().Msg("Forced flush completed")
 
 	// Step 3: Load flushed data **without locking**
 	flushedData, err := e.loadFromFile(e.flushPath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to load flushed data: %w", err)
 	}
-	log.Println("Flushed data loaded")
+	log.Trace().Msg("Flushed data loaded")
 
 	// Step 4: Load existing data from data.db **without locking**
 	existingData, err := e.loadFromFile(e.filePath)
 	if err != nil {
 		return fmt.Errorf("failed to load existing data: %w", err)
 	}
-	log.Println("Existing data loaded")
+	log.Trace().Msg("Existing data loaded")
 
 	// Step 5: Merge flushed data into existing data
 	for key, value := range flushedData {
 		existingData[key] = value
 	}
-	log.Println("Data merged")
+	log.Trace().Msg("Data merged")
 
 	// Step 6: Save merged data to main data file
 	if err := e.SaveFile(existingData); err != nil {
 		return fmt.Errorf("failed to save merged data: %w", err)
 	}
-	log.Println("Merged data saved")
+	log.Trace().Msg("Merged data saved")
 
 	// Step 7: Update memory usage accurately
 	e.mu.Lock()
@@ -400,15 +401,15 @@ func (e *Engine) CompactFlushedData() error {
 	e.saveChan = saveWorker // Restore save worker after compaction
 	e.mu.Unlock()
 
-	log.Println("Memory usage updated")
+	log.Trace().Msg("Memory usage updated")
 
 	// Step 8: Remove flushed.db after unlocking
 	if err := os.Remove(e.flushPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove flushed file: %w", err)
 	}
-	log.Println("Flushed data removed")
+	log.Trace().Msg("Flushed data removed")
 
-	log.Println("Compaction completed successfully.")
+	log.Info().Bool("success", true).Msg("Compaction completed successfully.")
 	return nil
 }
 
@@ -423,8 +424,8 @@ func (e *Engine) Save() error {
 func (e *Engine) PrintMemoryUsage() {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
-	log.Printf("HeapAlloc: %d KB, TotalAlloc: %d KB, Sys: %d KB\n", memStats.HeapAlloc/1024, memStats.TotalAlloc/1024, memStats.Sys/1024)
-	log.Printf("Current Store Memory Usage: %d bytes\n", e.currentMemoryUsage)
+	log.Debug().Msgf("HeapAlloc: %d KB, TotalAlloc: %d KB, Sys: %d KB\n", memStats.HeapAlloc/1024, memStats.TotalAlloc/1024, memStats.Sys/1024)
+	log.Debug().Msgf("Current Store Memory Usage: %d bytes\n", e.currentMemoryUsage)
 }
 
 // Testing Helpers

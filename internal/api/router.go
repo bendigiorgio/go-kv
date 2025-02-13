@@ -3,13 +3,14 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/bendigiorgio/go-kv/internal/engine"
-	internal "github.com/bendigiorgio/go-kv/internal/web"
 	"github.com/bendigiorgio/go-kv/internal/web/routes"
+	"github.com/rs/zerolog/log"
+
+	internal "github.com/bendigiorgio/go-kv/internal/web"
 )
 
 // Router is a simple HTTP router with graceful shutdown and an Engine reference
@@ -78,7 +79,7 @@ func (r *Router) Start(port string) error {
 		Handler: r.mux,
 	}
 
-	log.Printf("Server starting on port %s\n", port)
+	log.Info().Msgf("Server starting on port %s\n", port)
 	err := r.server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		return err
@@ -95,7 +96,7 @@ func (r *Router) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	log.Println("Shutting down server...")
+	log.Info().Msg("Shutting down server...")
 	return r.server.Shutdown(ctx)
 }
 
@@ -104,6 +105,6 @@ func jsonResponse(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("Failed to encode JSON response: %v\n", err)
+		log.Error().Stack().Err(err).Msg("Failed to encode JSON response")
 	}
 }

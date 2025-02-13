@@ -1,16 +1,26 @@
 package main
 
 import (
+	"strconv"
+
 	"github.com/bendigiorgio/go-kv/internal/api"
 	"github.com/bendigiorgio/go-kv/internal/engine"
+	"github.com/bendigiorgio/go-kv/internal/utils"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
-	e, err := engine.NewEngine("data.db", "flush.db", 1024*1024)
+	cfg, err := utils.LoadConfig()
+	log.Debug().Msgf("Loaded config: %+v", cfg)
 	if err != nil {
-		panic(err)
+		log.Panic().Err(err)
+	}
+	utils.SetupLogger(cfg)
+	e, err := engine.NewEngine(cfg.Database.FilePath, cfg.Database.FlushFilePath, cfg.Database.MaxMemory)
+	if err != nil {
+		log.Panic().Err(err)
 	}
 	router := api.NewRouter(e, true)
-	router.Start("8080")
+	router.Start(strconv.Itoa(cfg.AppPort))
 
 }

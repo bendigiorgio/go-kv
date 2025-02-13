@@ -10,7 +10,7 @@ import (
 	"github.com/go-faker/faker/v4"
 )
 
-const SEED_LENGTH = 1000
+const SEED_LENGTH = 20001
 
 type FakerKV struct {
 	Key   string

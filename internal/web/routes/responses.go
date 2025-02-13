@@ -2,8 +2,9 @@ package routes
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
+
+	"github.com/rs/zerolog/log"
 )
 
 func respondWithJSON(w http.ResponseWriter, code int, payload any) {
@@ -11,7 +12,7 @@ func respondWithJSON(w http.ResponseWriter, code int, payload any) {
 	jsonPay, err := json.Marshal(payload)
 
 	if err != nil {
-		log.Printf("Error when marshaling JSON: %s", err)
+		log.Error().Stack().Err(err).Msg("Error when marshaling JSON")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

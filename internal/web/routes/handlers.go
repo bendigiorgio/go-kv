@@ -1,11 +1,11 @@
 package routes
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/bendigiorgio/go-kv/internal/api/api_errors"
 	"github.com/bendigiorgio/go-kv/internal/engine"
+	"github.com/rs/zerolog/log"
 )
 
 type CustomHandler func(w http.ResponseWriter, request *http.Request, engine *engine.Engine) error
@@ -14,7 +14,7 @@ func NewHandler(customHandler CustomHandler, engine *engine.Engine) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := customHandler(w, r, engine)
 		if err != nil {
-			log.Printf("Error: %s", err.Error())
+			log.Error().Stack().Err(err).Msgf("Error")
 			if clientErr, ok := err.(*api_errors.ClientErr); ok {
 				respondWithJSON(w, clientErr.HttpCode, clientErr)
 			} else {
@@ -35,7 +35,7 @@ func NewHandlerNoEngine(customHandler CustomHandlerNoEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := customHandler(w, r)
 		if err != nil {
-			log.Printf("Error: %s", err.Error())
+			log.Error().Stack().Err(err).Msgf("Error")
 			if clientErr, ok := err.(*api_errors.ClientErr); ok {
 				respondWithJSON(w, clientErr.HttpCode, clientErr)
 			} else {

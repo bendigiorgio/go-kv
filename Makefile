@@ -21,4 +21,4 @@ notify-templ-proxy:
 
 dev:
 	@make templ & sleep 1
-	@air -c air.toml && px @tailwindcss/cli -i ./internal/web/static/css/style.css -o ./internal/web/static/css/tailwind.css --watch
+	@DEV_MODE=true air -c air.toml && px @tailwindcss/cli -i ./internal/web/static/css/style.css -o ./internal/web/static/css/tailwind.css --watch

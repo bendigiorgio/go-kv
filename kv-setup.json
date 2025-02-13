@@ -1,0 +1,11 @@
+{
+  "appPort": 8080,
+  "logLevel": -1,
+  "logFile": "./logs/app.log",
+  "logOutput": "both",
+  "database": {
+    "filePath": "./db/app.db",
+    "flushFilePath": "./db/flush.db",
+    "maxMemory": 5242880
+  }
+}

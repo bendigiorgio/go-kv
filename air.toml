@@ -4,7 +4,7 @@ tmp_dir = "bin"
 [build]
 args_bin = []
 bin = "./bin/main"
-cmd = "make notify-templ-proxy && make build-tailwind && go build -tags local -o ./bin/main cmd/main/main.go"
+cmd = "make notify-templ-proxy && make build-tailwind && DEV_MODE=true go build -tags local -o ./bin/main cmd/main/main.go"
 delay = 1000
 exclude_dir = ["tmp", "bin"]
 exclude_file = []
